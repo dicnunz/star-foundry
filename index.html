@@ -7,16 +7,34 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="app-shell">
-  <header class="topbar">
-    <div class="metric">
-      <div class="metric-label">Stardust</div>
-      <div id="stardustDisplay" class="metric-value">0</div>
+  <div class="background-layer background-stars"></div>
+  <div class="background-layer background-nebula"></div>
+
+  <header class="hud">
+    <div class="hud-title">
+      <h1>Star Foundry Command Deck</h1>
+      <p>Oversee the industrialization of a newborn star and shape a new galactic era.</p>
     </div>
-    <div class="metric">
-      <div class="metric-label">per second</div>
-      <div id="spsDisplay" class="metric-value">0</div>
+
+    <div class="resource-grid">
+      <div class="resource-card" data-resource="stardust">
+        <div class="resource-label">Stardust</div>
+        <div id="stardustDisplay" class="resource-value">0</div>
+        <div id="stardustRateDisplay" class="resource-rate">+0 /s</div>
+      </div>
+      <div class="resource-card" data-resource="energy">
+        <div class="resource-label">Stellar Energy</div>
+        <div id="energyDisplay" class="resource-value">0</div>
+        <div id="energyRateDisplay" class="resource-rate">+0 /s</div>
+      </div>
+      <div class="resource-card" data-resource="research">
+        <div class="resource-label">Research Data</div>
+        <div id="researchDisplay" class="resource-value">0</div>
+        <div id="researchRateDisplay" class="resource-rate">+0 /s</div>
+      </div>
     </div>
-    <div class="controls">
+
+    <div class="hud-controls">
       <button id="saveBtn" class="mini-btn">Save</button>
       <button id="loadBtn" class="mini-btn mini-btn-alt">Load</button>
       <button id="resetBtn" class="mini-btn mini-btn-danger">Reset</button>
@@ -25,34 +43,56 @@
 
   <div id="statusMessage" class="status-message" role="status" aria-live="polite"></div>
 
-  <main class="layout">
-    <!-- Left: Click zone -->
-    <section class="column clickzone-card">
-      <div class="section-title">Star Core</div>
-      <div class="click-core-wrapper">
+  <main class="main-layout">
+    <section class="panel core-panel">
+      <div class="panel-header">
+        <h2>Star Core</h2>
+        <div class="panel-subtitle">Manual Extraction Array</div>
+      </div>
+      <div class="star-scene">
+        <div class="star-orbit"></div>
         <button id="coreButton" class="core-button" aria-label="Extract Stardust">
-          <div class="core-inner-glow"></div>
-          <div class="core-inner-ring"></div>
-          <div class="core-text">Extract</div>
+          <span class="core-sigil"></span>
+          <span class="core-spark"></span>
+          <span class="core-text">Extract</span>
         </button>
       </div>
-      <div class="hint-text">+1 Stardust per click (base)</div>
+      <div class="core-yield">
+        <div class="core-yield-label">Current manual yield</div>
+        <div id="clickYieldDisplay" class="core-yield-value">+1 Stardust</div>
+      </div>
+      <p class="panel-description">
+        Each pulse vents raw plasma from the star. Your command crew stabilizes the flow, converting it into Stardust, Stellar
+        Energy, and rare insight for future breakthroughs.
+      </p>
     </section>
 
-    <!-- Right: Shop -->
-    <section class="column shop-card">
-      <div class="section-title">Automations</div>
+    <section class="panel automation-panel">
+      <div class="panel-header">
+        <h2>Industrial Wings</h2>
+        <div class="panel-subtitle">Automated infrastructure scaling your foundry.</div>
+      </div>
+      <div id="automationList" class="card-list"></div>
+    </section>
 
-      <div id="shopList" class="shop-list">
-        <!-- Automation cards injected by JS -->
+    <section class="panel upgrade-panel">
+      <div class="panel-header">
+        <h2>Research &amp; Upgrades</h2>
+        <div class="panel-subtitle">Invest discoveries to unlock advanced systems.</div>
+      </div>
+      <div id="upgradeList" class="card-list upgrade-list"></div>
+      <div class="log-panel">
+        <div class="panel-header small">
+          <h3>Mission Log</h3>
+          <div class="panel-subtitle">Latest operational reports</div>
+        </div>
+        <div id="eventLog" class="log-body"></div>
       </div>
     </section>
   </main>
 
   <footer class="bottombar">
-    <div class="footer-note">
-      Star Foundry v0 • MIT License
-    </div>
+    <div class="footer-note">Star Foundry • Galactic Expansion Initiative • MIT License</div>
   </footer>
 
   <script src="main.js"></script>
