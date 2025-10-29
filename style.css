@@ -9,6 +9,24 @@ body.app-shell {
   flex-direction: column;
 }
 
+.status-message {
+  min-height: 1.25rem;
+  text-align: center;
+  color: #8a88c7;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0.4rem 1rem 0.4rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.status-message.visible {
+  opacity: 1;
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(80, 150, 255, 0.8);
+}
+
 /* Top bar */
 .topbar {
   background: radial-gradient(circle at 20% 20%, #1a1a2f 0%, #0a0a12 70%);
