@@ -13,9 +13,11 @@ No build step. No server required.
 ## Features (v0)  
 - Click the Star Core to gain Stardust.  
 - Buy Automations (Drones, Refineries, Orbital Arrays).  
-- Automations generate passive Stardust per second.  
-- Costs scale as you buy more.  
-- Game auto-saves to `localStorage`.  
+- Automations generate passive Stardust per second.
+- Costs scale as you buy more.
+- Auto-save runs every 30 seconds, when the tab is hidden, and before closing the page.
+- Manual Save/Load/Reset controls with feedback messages.
+- Offline progress grants up to 12 hours of passive Stardust when you return.
   
 ## Roadmap  
 - Upgrades tab.  

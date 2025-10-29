@@ -37,6 +37,8 @@ const gameState = {
 
 // how fast cost scales each time you buy the same automation
 const COST_GROWTH = 1.15;
+const AUTO_SAVE_INTERVAL_MS = 30 * 1000; // 30 seconds
+const OFFLINE_PROGRESS_CAP_SECONDS = 12 * 60 * 60; // 12 hours
 
 // DOM refs
 const stardustDisplay = document.getElementById("stardustDisplay");
@@ -47,6 +49,11 @@ const shopList = document.getElementById("shopList");
 const saveBtn = document.getElementById("saveBtn");
 const loadBtn = document.getElementById("loadBtn");
 const resetBtn = document.getElementById("resetBtn");
+const statusMessage = document.getElementById("statusMessage");
+
+const shopElements = new Map();
+let statusTimeoutId = null;
+let autoSaveIntervalId = null;
 
 // =========================
 // Utility math
@@ -71,17 +78,59 @@ function computeTotalSPS() {
 }
 
 function formatNumber(n) {
-  // simple formatter for readability
-  if (n >= 1_000_000_000) {
-    return (n / 1_000_000_000).toFixed(2) + "B";
+  const value = Number(n);
+  if (!Number.isFinite(value)) return "0";
+  if (value === 0) return "0";
+
+  if (value >= 1_000_000_000) {
+    return (value / 1_000_000_000).toFixed(2) + "B";
   }
-  if (n >= 1_000_000) {
-    return (n / 1_000_000).toFixed(2) + "M";
+  if (value >= 1_000_000) {
+    return (value / 1_000_000).toFixed(2) + "M";
   }
-  if (n >= 1_000) {
-    return (n / 1_000).toFixed(2) + "K";
+  if (value >= 1_000) {
+    return Math.floor(value).toLocaleString(undefined, {
+      maximumFractionDigits: 0,
+    });
   }
-  return Math.floor(n).toString();
+  if (value >= 10) {
+    return value.toLocaleString(undefined, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+  }
+  if (Number.isInteger(value)) {
+    return value.toLocaleString(undefined, {
+      maximumFractionDigits: 0,
+    });
+  }
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatDuration(seconds) {
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const remSeconds = totalSeconds % 60;
+  if (minutes < 60) {
+    return `${minutes}m ${remSeconds}s`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  if (hours < 24) {
+    return `${hours}h ${remMinutes}m`;
+  }
+
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return `${days}d ${remHours}h`;
 }
 
 // =========================
@@ -103,6 +152,7 @@ function buyAutomation(key) {
     gameState.stardust -= cost;
     a.count += 1;
     render();
+    saveGame();
   }
 }
 
@@ -112,22 +162,17 @@ function buyAutomation(key) {
 
 function renderTopBar() {
   stardustDisplay.textContent = formatNumber(gameState.stardust);
-  spsDisplay.textContent = computeTotalSPS().toFixed(2);
+  spsDisplay.textContent = formatNumber(computeTotalSPS());
 }
 
-function renderShop() {
-  // clear
+function buildShop() {
   shopList.innerHTML = "";
+  shopElements.clear();
 
   for (const a of gameState.automations) {
-    const cost = computeAutomationCost(a);
-    const canAfford = gameState.stardust >= cost;
-
-    // container
     const item = document.createElement("div");
     item.className = "shop-item";
 
-    // left side
     const left = document.createElement("div");
     left.className = "shop-left";
 
@@ -153,16 +198,15 @@ function renderShop() {
     statsRow.className = "shop-stats-row";
     statsRow.innerHTML =
       "Yield: " +
-      a.baseSPS +
+      formatNumber(a.baseSPS) +
       " /s each<br>Current total: " +
-      computeAutomationSPS(a).toFixed(2) +
+      formatNumber(computeAutomationSPS(a)) +
       " /s";
 
     left.appendChild(titleRow);
     left.appendChild(descEl);
     left.appendChild(statsRow);
 
-    // right side
     const right = document.createElement("div");
     right.className = "buy-area";
 
@@ -172,29 +216,75 @@ function renderShop() {
 
     const costValue = document.createElement("div");
     costValue.className = "cost-value";
-    costValue.textContent = formatNumber(cost) + " Stardust";
-
+    const initialCost = computeAutomationCost(a);
+    costValue.textContent = formatNumber(initialCost) + " Stardust";
     const btn = document.createElement("button");
     btn.className = "buy-btn";
     btn.textContent = "Buy";
-    btn.disabled = !canAfford;
+    btn.disabled = gameState.stardust < initialCost;
     btn.addEventListener("click", () => buyAutomation(a.key));
 
     right.appendChild(costLabel);
     right.appendChild(costValue);
     right.appendChild(btn);
 
-    // assemble
     item.appendChild(left);
     item.appendChild(right);
 
     shopList.appendChild(item);
+
+    shopElements.set(a.key, {
+      ownedEl,
+      statsRow,
+      costValue,
+      button: btn,
+      lastCount: a.count,
+    });
   }
+}
+
+function updateShopDetails() {
+  for (const a of gameState.automations) {
+    const entry = shopElements.get(a.key);
+    if (!entry) continue;
+
+    const cost = computeAutomationCost(a);
+
+    if (entry.lastCount !== a.count) {
+      entry.ownedEl.textContent = "owned: " + a.count;
+      entry.statsRow.innerHTML =
+        "Yield: " +
+        formatNumber(a.baseSPS) +
+        " /s each<br>Current total: " +
+        formatNumber(computeAutomationSPS(a)) +
+        " /s";
+
+      entry.costValue.textContent = formatNumber(cost) + " Stardust";
+      entry.lastCount = a.count;
+    }
+
+    if (entry.button) {
+      entry.button.disabled = gameState.stardust < cost;
+    }
+  }
+}
+
+function showStatus(message) {
+  if (!statusMessage) return;
+  statusMessage.textContent = message;
+  statusMessage.classList.add("visible");
+
+  if (statusTimeoutId) {
+    clearTimeout(statusTimeoutId);
+  }
+  statusTimeoutId = setTimeout(() => {
+    statusMessage.classList.remove("visible");
+  }, 4000);
 }
 
 function render() {
   renderTopBar();
-  renderShop();
+  updateShopDetails();
 }
 
 // =========================
@@ -221,43 +311,110 @@ function tick() {
 // Save / Load / Reset
 // =========================
 
-function saveGame() {
-  const data = JSON.stringify(gameState);
+function saveGame(options = {}) {
+  const { showFeedback = false } = options;
   try {
+    const snapshot = {
+      ...gameState,
+      lastUpdate: Date.now(),
+    };
+    const data = JSON.stringify(snapshot);
     localStorage.setItem("starFoundrySave", data);
+    if (showFeedback) {
+      showStatus("Game saved.");
+    }
   } catch (e) {
-    // ignore quota or privacy mode errors
+    if (showFeedback) {
+      showStatus("Unable to save (storage unavailable).");
+    }
   }
 }
 
-function loadGame() {
+function loadGame(options = {}) {
+  const { showFeedback = false } = options;
+  let raw;
   try {
-    const raw = localStorage.getItem("starFoundrySave");
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
+    raw = localStorage.getItem("starFoundrySave");
+  } catch (e) {
+    if (showFeedback) {
+      showStatus("Unable to access save data.");
+    }
+    return false;
+  }
 
-    // minimal schema validation to avoid crashes
-    if (typeof parsed.stardust === "number") {
-      gameState.stardust = parsed.stardust;
+  if (!raw) {
+    if (showFeedback) {
+      showStatus("No save found.");
     }
-    if (typeof parsed.productionMultiplier === "number") {
-      gameState.productionMultiplier = parsed.productionMultiplier;
+    return false;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    if (showFeedback) {
+      showStatus("Save data is corrupt.");
     }
-    if (Array.isArray(parsed.automations)) {
-      for (const savedAuto of parsed.automations) {
-        const localAuto = gameState.automations.find(
-          a => a.key === savedAuto.key
-        );
-        if (!localAuto) continue;
-        if (typeof savedAuto.count === "number") {
-          localAuto.count = savedAuto.count;
-        }
+    return false;
+  }
+
+  let loadedSomething = false;
+
+  if (typeof parsed.stardust === "number" && Number.isFinite(parsed.stardust)) {
+    gameState.stardust = Math.max(0, parsed.stardust);
+    loadedSomething = true;
+  }
+
+  if (
+    typeof parsed.productionMultiplier === "number" &&
+    Number.isFinite(parsed.productionMultiplier)
+  ) {
+    gameState.productionMultiplier = Math.max(0, parsed.productionMultiplier);
+  }
+
+  if (Array.isArray(parsed.automations)) {
+    for (const savedAuto of parsed.automations) {
+      const localAuto = gameState.automations.find(a => a.key === savedAuto.key);
+      if (!localAuto) continue;
+
+      if (typeof savedAuto.count === "number" && Number.isFinite(savedAuto.count)) {
+        localAuto.count = Math.max(0, Math.floor(savedAuto.count));
+        loadedSomething = true;
       }
     }
-  } catch (e) {
-    // ignore invalid JSON
   }
+
+  let offlineMessage = null;
+  if (typeof parsed.lastUpdate === "number" && Number.isFinite(parsed.lastUpdate)) {
+    let offlineSeconds = (Date.now() - parsed.lastUpdate) / 1000;
+    offlineSeconds = Math.max(0, Math.min(offlineSeconds, OFFLINE_PROGRESS_CAP_SECONDS));
+
+    if (offlineSeconds >= 1) {
+      const offlineGain = computeTotalSPS() * offlineSeconds;
+      if (offlineGain > 0.01) {
+        gameState.stardust += offlineGain;
+        offlineMessage =
+          "Recovered " +
+          formatNumber(offlineGain) +
+          " Stardust while away (" +
+          formatDuration(offlineSeconds) +
+          ")";
+      }
+    }
+  }
+
+  gameState.lastUpdate = Date.now();
   render();
+
+  if (offlineMessage) {
+    showStatus(offlineMessage);
+  } else if (showFeedback) {
+    showStatus("Save loaded.");
+  }
+
+  saveGame();
+  return loadedSomething;
 }
 
 function resetGame() {
@@ -271,6 +428,16 @@ function resetGame() {
   gameState.lastUpdate = Date.now();
   render();
   saveGame();
+  showStatus("Progress reset.");
+}
+
+function startAutoSaveLoop() {
+  if (autoSaveIntervalId) {
+    clearInterval(autoSaveIntervalId);
+  }
+  autoSaveIntervalId = setInterval(() => {
+    saveGame();
+  }, AUTO_SAVE_INTERVAL_MS);
 }
 
 // =========================
@@ -279,21 +446,28 @@ function resetGame() {
 
 coreButton.addEventListener("click", manualExtractClick);
 saveBtn.addEventListener("click", () => {
-  saveGame();
-  render();
+  saveGame({ showFeedback: true });
 });
 loadBtn.addEventListener("click", () => {
-  loadGame();
-  render();
+  loadGame({ showFeedback: true });
 });
-resetBtn.addEventListener("click", () => {
-  resetGame();
-  render();
+resetBtn.addEventListener("click", resetGame);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    saveGame();
+  }
+});
+
+window.addEventListener("beforeunload", () => {
+  saveGame();
 });
 
 // initial render and load
-loadGame();
+buildShop();
 render();
+loadGame();
+startAutoSaveLoop();
 // start loop
 gameState.lastUpdate = Date.now();
 requestAnimationFrame(tick);
