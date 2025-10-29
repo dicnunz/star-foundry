@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Star Foundry</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="app-shell">
+  <header class="topbar">
+    <div class="metric">
+      <div class="metric-label">Stardust</div>
+      <div id="stardustDisplay" class="metric-value">0</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">per second</div>
+      <div id="spsDisplay" class="metric-value">0</div>
+    </div>
+    <div class="controls">
+      <button id="saveBtn" class="mini-btn">Save</button>
+      <button id="loadBtn" class="mini-btn mini-btn-alt">Load</button>
+      <button id="resetBtn" class="mini-btn mini-btn-danger">Reset</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Left: Click zone -->
+    <section class="column clickzone-card">
+      <div class="section-title">Star Core</div>
+      <div class="click-core-wrapper">
+        <button id="coreButton" class="core-button" aria-label="Extract Stardust">
+          <div class="core-inner-glow"></div>
+          <div class="core-inner-ring"></div>
+          <div class="core-text">Extract</div>
+        </button>
+      </div>
+      <div class="hint-text">+1 Stardust per click (base)</div>
+    </section>
+
+    <!-- Right: Shop -->
+    <section class="column shop-card">
+      <div class="section-title">Automations</div>
+
+      <div id="shopList" class="shop-list">
+        <!-- Automation cards injected by JS -->
+      </div>
+    </section>
+  </main>
+
+  <footer class="bottombar">
+    <div class="footer-note">
+      Star Foundry v0 • MIT License
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
